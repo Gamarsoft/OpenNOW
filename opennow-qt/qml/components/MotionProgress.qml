@@ -10,8 +10,9 @@ Item {
     property int exitDuration: 160
     property real closedScale: 0.97
     property real progress: 0
+    readonly property bool reducedMotion: AppController.reducedMotion
     readonly property bool present: shown || progress > 0
-    readonly property real zoom: AppController.reducedMotion ? 1 : closedScale + (1 - closedScale) * progress
+    readonly property real zoom: reducedMotion ? 1 : closedScale + (1 - closedScale) * progress
     property bool initialized: false
     signal hidden()
 
@@ -20,7 +21,7 @@ Item {
             return
         const target = shown ? 1 : 0
         animation.stop()
-        if (AppController.reducedMotion || progress === target) {
+        if (reducedMotion || progress === target) {
             progress = target
             return
         }
@@ -30,6 +31,7 @@ Item {
         animation.start()
     }
     onShownChanged: synchronize()
+    onReducedMotionChanged: if (reducedMotion) synchronize()
     Component.onCompleted: { initialized = true; synchronize() }
     onProgressChanged: if (initialized && progress === 0 && !shown)
         Qt.callLater(() => { if (!root.shown && root.progress === 0) root.hidden() })
@@ -39,12 +41,5 @@ Item {
         target: root
         property: "progress"
         easing.type: Easing.OutCubic
-    }
-    Connections {
-        target: AppController
-        function onReducedMotionChanged() {
-            if (AppController.reducedMotion)
-                root.synchronize()
-        }
     }
 }

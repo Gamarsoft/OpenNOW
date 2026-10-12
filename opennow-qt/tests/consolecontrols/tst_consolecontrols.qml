@@ -52,6 +52,14 @@ TestCase {
         }
     }
 
+    Component {
+        id: motionComponent
+        MotionProgress {
+            enterDuration: 500
+            exitDuration: 500
+        }
+    }
+
     SignalSpy { id: safeSpy; signalName: "safeRequested" }
     SignalSpy { id: actionSpy; signalName: "actionRequested" }
     SignalSpy { id: chosenSpy; signalName: "chosen" }
@@ -218,6 +226,28 @@ TestCase {
         sheet.opened = false
         tryCompare(sheet, "visible", false)
         compare(actionSpy.count, 0)
+    }
+
+    function test_reducedMotionStopsAnActiveReveal_data() {
+        return [{tag: "opening", opening: true}, {tag: "closing", opening: false}]
+    }
+
+    function test_reducedMotionStopsAnActiveReveal(data) {
+        failOnWarning(/Detected function.*onReducedMotionChanged/)
+        const motion = createTemporaryObject(motionComponent, testCase, {shown: !data.opening})
+        verify(motion !== null)
+        compare(motion.progress, data.opening ? 0 : 1)
+        AppController.reducedMotion = false
+        motion.shown = data.opening
+        tryVerify(() => motion.progress > 0 && motion.progress < 1)
+
+        AppController.reducedMotion = true
+        compare(motion.progress, data.opening ? 1 : 0)
+        compare(motion.zoom, 1)
+
+        AppController.reducedMotion = false
+        motion.shown = !data.opening
+        tryVerify(() => motion.progress > 0 && motion.progress < 1)
     }
 
     function test_longWarningKeepsActionsVisible() {
