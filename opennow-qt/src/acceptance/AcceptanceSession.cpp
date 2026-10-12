@@ -176,6 +176,7 @@ int AcceptanceSession::startWorkload()
                     ? m_arguments.at(index + 1) : QString{};
             }(),
             .requireHardware = m_arguments.contains(u"--performance-require-hardware"_s),
+            .fullscreen = m_arguments.contains(u"--performance-fullscreen"_s),
         };
         auto *profiler = new AcceptanceProfiler(
             window, &m_controller, std::move(options),

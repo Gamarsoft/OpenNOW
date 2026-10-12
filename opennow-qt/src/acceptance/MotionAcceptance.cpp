@@ -6,6 +6,7 @@
 #include <QPointer>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QQmlProperty>
 #include <QTimer>
 #include <QVariant>
 #include <cmath>
@@ -135,8 +136,35 @@ void startSettingsMotionAcceptance(QQuickWindow *window, AppController *controll
             auto *shortcuts = find("renewInlineShortcuts");
             if (!require(shortcuts && shortcuts->height() > 0, "shortcuts have no expanded height")) return;
         }
+        if (tick == 203) {
+            // Sidebar assignment replaces the initial section binding in real QML.
+            QQmlProperty::write(state->settings, QStringLiteral("selectedSection"), 12);
+            state->settings->setProperty("searchQuery", QStringLiteral("stale search"));
+            state->settings->setProperty("advancedOpen", true);
+        }
         if (tick == 205) controller->navigate(QStringLiteral("library"));
         if (tick == 208) controller->navigate(QStringLiteral("home"));
+        if (tick == 209) {
+            auto *cached = find("desktopSettingsScreen");
+            if (!require(cached == state->settings && !cached->isVisible()
+                         && !cached->property("active").toBool()
+                         && cached->property("searchQuery").toString().isEmpty()
+                         && !cached->property("advancedOpen").toBool(),
+                         "settings cache retained stale transient state")) return;
+        }
+        if (tick == 210) controller->navigate(QStringLiteral("settings-streaming"));
+        if (tick == 212) {
+            auto *cached = find("desktopSettingsScreen");
+            auto *picker = find("renewResolutionPicker");
+            auto *focus = window->activeFocusItem();
+            if (!require(cached == state->settings && cached->isVisible()
+                         && cached->property("active").toBool() && picker
+                         && cached->property("selectedSection").toInt() == 3
+                         && !picker->property("expanded").toBool()
+                         && focus && (focus == cached || cached->isAncestorOf(focus)),
+                         "cached settings did not restore its page and focus")) return;
+        }
+        if (tick == 215) controller->navigate(QStringLiteral("home"));
         if (tick == 230) {
             auto *page = find("desktopPageLoader");
             if (!require(page && page->opacity() == 1, "rapid navigation left a faded page")) return;

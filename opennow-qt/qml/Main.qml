@@ -8,8 +8,8 @@ ApplicationWindow {
     height: 900
     minimumWidth: 960
     minimumHeight: 540
-    visible: true
-    visibility: ApplicationWindow.Windowed
+    visible: false
+    visibility: ApplicationWindow.Hidden
     color: "black"
     title: qsTr("OpenNOW")
     WindowTheme {

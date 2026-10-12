@@ -262,7 +262,9 @@ bool GraphicsDeviceSelection::applyTo(QQuickWindow *window) const
 {
     if (!m_active.luid) return true;
 #ifdef Q_OS_WIN
-    if (!window || window->isVisible() || window->isSceneGraphInitialized()) return false;
+    if (!window || window->isVisible()) return false;
+    if (window->rendererInterface()->graphicsApi() == QSGRendererInterface::Software) return true;
+    if (window->isSceneGraphInitialized()) return false;
     window->setGraphicsDevice(QQuickGraphicsDevice::fromAdapter(
         quint32(m_active.luid), std::bit_cast<qint32>(quint32(m_active.luid >> 32))));
     qInfo("Selected graphics adapter: %s (LUID %016llx)", qUtf8Printable(m_active.name),

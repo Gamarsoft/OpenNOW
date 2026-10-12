@@ -17,9 +17,17 @@ FocusScope {
     // Game details are modal on desktop. Keep the route beneath the modal so
     // opening a Home or Store tile does not silently swap in the Library page.
     property string contentRoute: "home"
+    property bool settingsWarmupRequested: false
+    property int settingsRouteSection: 3
+    onSettingsRouteSectionChanged: if (settingsVisible && settingsLoader.item)
+        settingsLoader.item.selectedSection = settingsRouteSection
+    readonly property bool settingsVisible: shellVisible
+        && (contentRoute.indexOf("settings") === 0 || contentRoute === "controllers")
     readonly property string requestedContentRoute: route === "game-detail"
         ? (AppController.backRoute || "library") : route
     onRequestedContentRouteChanged: {
+        if (requestedContentRoute.indexOf("settings") === 0 || requestedContentRoute === "controllers")
+            settingsRouteSection = settingsSection(requestedContentRoute)
         if (requestedContentRoute !== "inserting" && requestedContentRoute !== "stream")
             contentRoute = requestedContentRoute
     }
@@ -70,7 +78,7 @@ FocusScope {
         if (value === "updates") return updatesComponent
         if (value === "store") return storeComponent
         if (value === "friends") return friendsComponent
-        if (value.indexOf("settings") === 0 || value === "controllers") return settingsComponent
+        if (value.indexOf("settings") === 0 || value === "controllers") return null
         if (value === "library" || value === "game-detail") return libraryComponent
         return homeComponent
     }
@@ -103,9 +111,16 @@ FocusScope {
             bugReportNotice.restoreFocus()
             return
         }
+        const page = root.settingsVisible ? settingsLoader.item : pageLoader.item
         if (root.shellVisible && root.route !== "game-detail" && !root.commandOpen
-                && AppController.overlay === "" && pageLoader.item)
-            pageLoader.item.forceActiveFocus()
+                && AppController.overlay === "" && page)
+            page.forceActiveFocus()
+    }
+
+    Timer {
+        interval: 250
+        running: root.shellVisible && !root.settingsWarmupRequested
+        onTriggered: root.settingsWarmupRequested = true
     }
 
     DesktopSignInScreen {
@@ -159,6 +174,26 @@ FocusScope {
             transform: Translate { y: pageEntrance.offset }
             PageEntrance { id: pageEntrance; objectName: "desktopPageEntrance" }
             onLoaded: {
+                pageEntrance.restart()
+                Qt.callLater(root.restoreShellFocus)
+            }
+        }
+        Loader {
+            id: settingsLoader
+            objectName: "desktopSettingsLoader"
+            anchors.fill: parent
+            active: root.settingsVisible || (root.settingsWarmupRequested && root.shellVisible)
+            asynchronous: !root.settingsVisible
+            visible: root.settingsVisible
+            sourceComponent: settingsComponent
+            opacity: pageEntrance.pageOpacity
+            transform: Translate { y: pageEntrance.offset }
+            onVisibleChanged: if (visible && item) {
+                item.selectedSection = root.settingsRouteSection
+                pageEntrance.restart()
+                Qt.callLater(root.restoreShellFocus)
+            }
+            onLoaded: if (root.settingsVisible) {
                 pageEntrance.restart()
                 Qt.callLater(root.restoreShellFocus)
             }
@@ -310,7 +345,8 @@ FocusScope {
     Component {
         id: settingsComponent
         DesktopSettingsScreen {
-            selectedSection: root.settingsSection(root.route)
+            active: root.settingsVisible
+            selectedSection: root.settingsRouteSection
             onSelectedSectionChanged: root.settingsSubtitle = pageTitles[selectedSection]
             onRequestConsoleMode: enabled => ShellStore.requestConsoleSurface(enabled)
             Component.onCompleted: root.settingsSubtitle = pageTitles[selectedSection]
@@ -348,6 +384,8 @@ FocusScope {
         root.updateUiScale()
         if (root.requestedContentRoute !== "inserting" && root.requestedContentRoute !== "stream")
             root.contentRoute = root.requestedContentRoute
+        if (root.settingsVisible)
+            root.settingsRouteSection = root.settingsSection(root.requestedContentRoute)
         Qt.callLater(() => {
             if (root.signInVisible)
                 desktopSignIn.forceActiveFocus()

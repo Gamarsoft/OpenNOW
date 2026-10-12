@@ -13,6 +13,8 @@ Item {
     property var value: ""
     property string valueLabel: ""
     property bool expanded: false
+    // Create tiles on first expansion, then retain them through closing and reversals.
+    property bool optionsCreated: false
     property bool showDivider: true
     property int maximumColumns: 0
     property real maximumOptionsHeight: DesktopTokens.px(260)
@@ -38,6 +40,7 @@ Item {
     clip: true
     MotionProgress { id: reveal; shown: root.expanded; enterDuration: 200; exitDuration: 160 }
     onExpandedChanged: {
+        if (expanded) optionsCreated = true
         if (expanded) { search.clear(); search.forceActiveFocus() }
         else selector.forceActiveFocus()
     }
@@ -89,7 +92,7 @@ Item {
             id: grid
             width: parent.width - 12; spacing: 14
             Repeater {
-                model: root.groups
+                model: root.optionsCreated ? root.groups : []
                 delegate: Column {
                     required property var modelData
                     width: grid.width; spacing: 8

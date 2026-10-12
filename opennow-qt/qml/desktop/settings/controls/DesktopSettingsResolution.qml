@@ -10,6 +10,8 @@ Item {
     property var items: []
     property string value: "1920x1080"
     property bool expanded: false
+    // Create tiles on first expansion, then retain them through closing and reversals.
+    property bool optionsCreated: false
     property bool fitsMonitor: false
     signal selected(string value)
     readonly property var choices: items.filter(item => item.kind !== "heading")
@@ -36,6 +38,7 @@ Item {
     clip: true
     MotionProgress { id: reveal; shown: root.expanded; enterDuration: 200; exitDuration: 160 }
     onExpandedChanged: {
+        if (expanded) optionsCreated = true
         if (expanded) gridFlick.forceActiveFocus()
         else stepper.focusSelector()
     }
@@ -94,7 +97,7 @@ Item {
         Column {
             id: gridContents; width: parent.width; spacing: 14
             Repeater {
-                model: root.groups
+                model: root.optionsCreated ? root.groups : []
                 delegate: Column {
                     required property var modelData
                     width: gridContents.width; spacing: 8

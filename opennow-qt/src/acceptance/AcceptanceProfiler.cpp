@@ -86,16 +86,29 @@ bool AcceptanceProfiler::start()
     const auto dpr = std::max(1.0, m_window->effectiveDevicePixelRatio());
     m_window->setWidth(qRound(static_cast<double>(m_options.width) / dpr));
     m_window->setHeight(qRound(static_cast<double>(m_options.height) / dpr));
-    m_window->show();
+    if (m_options.fullscreen)
+        m_window->showFullScreen();
+    else
+        m_window->show();
     m_window->requestActivate();
     m_timer.start();
+    connect(m_window, &QQuickWindow::afterSynchronizing,
+            this, [this] {
+        // The GUI thread is blocked here, so this frame includes the published action.
+        m_synchronizedStep = m_pendingStep.load(std::memory_order_acquire);
+    }, Qt::DirectConnection);
     connect(m_window, &QQuickWindow::frameSwapped,
             this, [this] {
         const auto renderedNs = m_timer.nsecsElapsed();
-        QMetaObject::invokeMethod(this, [this, renderedNs] {
-            observeFrame(renderedNs);
+        const auto synchronizedStep = m_synchronizedStep;
+        QMetaObject::invokeMethod(this, [this, synchronizedStep, renderedNs] {
+            observeFrame(synchronizedStep, renderedNs);
+            // Keep the workload rendering between transitions. Otherwise an
+            // idle scene can look like a missed frame when it next changes.
+            if (!m_finished) m_window->update();
         }, Qt::QueuedConnection);
     }, Qt::DirectConnection);
+    m_window->update();
     QTimer::singleShot(WarmupMs, this, &AcceptanceProfiler::advance);
     QTimer::singleShot(WarmupMs + (m_actions.size() + 2) * StepDurationMs,
                        this, [this] {
@@ -122,13 +135,17 @@ void AcceptanceProfiler::advance()
         : m_controller->navigate(result.action.value);
     m_results.push_back(std::move(result));
     m_activeStep = m_results.size() - 1;
+    m_pendingStep.store(m_activeStep, std::memory_order_release);
     QTimer::singleShot(StepDurationMs, this, &AcceptanceProfiler::advance);
 }
 
-void AcceptanceProfiler::observeFrame(qint64 renderedNs)
+void AcceptanceProfiler::observeFrame(qsizetype synchronizedStep, qint64 renderedNs)
 {
     if (m_activeStep < 0 || m_activeStep >= m_results.size() || m_finished) return;
+    if (synchronizedStep != m_activeStep) return;
     auto &result = m_results[m_activeStep];
+    // A queued callback can belong to a frame rendered before this action.
+    if (renderedNs < result.startedNs || renderedNs <= result.lastFrameNs) return;
     if (result.firstFrameNs < 0) result.firstFrameNs = renderedNs;
     if (result.lastFrameNs >= result.startedNs) {
         result.frameIntervalsMs.push_back(
@@ -140,6 +157,7 @@ void AcceptanceProfiler::observeFrame(qint64 renderedNs)
 void AcceptanceProfiler::finalizeActiveStep()
 {
     if (m_activeStep < 0 || m_activeStep >= m_results.size()) return;
+    m_pendingStep.store(-1, std::memory_order_release);
     m_results[m_activeStep].focusValid = focusIsValid();
     m_activeStep = -1;
 }
@@ -299,6 +317,8 @@ bool AcceptanceProfiler::writeReport(bool passed,
             {u"actualPhysicalHeight"_s, physicalSize.height()},
             {u"logicalWidth"_s, m_window->width()},
             {u"logicalHeight"_s, m_window->height()},
+            {u"requestedWindowMode"_s, m_options.fullscreen ? u"fullscreen"_s : u"windowed"_s},
+            {u"actualWindowVisibility"_s, static_cast<int>(m_window->visibility())},
         }},
         {u"budget"_s, QJsonObject{
             {u"p95IntervalMultiplier"_s, IntervalBudgetMultiplier},
@@ -310,6 +330,7 @@ bool AcceptanceProfiler::writeReport(bool passed,
             {u"cycles"_s, m_options.cycles},
             {u"stepDurationMs"_s, StepDurationMs},
             {u"transitionCount"_s, m_actions.size()},
+            {u"continuousRendering"_s, true},
         }},
         {u"aggregates"_s, aggregates},
         {u"steps"_s, steps},

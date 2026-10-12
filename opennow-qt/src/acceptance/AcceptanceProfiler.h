@@ -8,6 +8,7 @@
 #include <QSize>
 #include <QVector>
 
+#include <atomic>
 #include <functional>
 
 class AppController;
@@ -24,6 +25,7 @@ public:
         double refreshRateHz = 0.0;
         QString machineLabel;
         bool requireHardware = false;
+        bool fullscreen = false;
     };
 
     using Completion = std::function<void(bool)>;
@@ -55,7 +57,7 @@ private:
     };
 
     void advance();
-    void observeFrame(qint64 renderedNs);
+    void observeFrame(qsizetype synchronizedStep, qint64 renderedNs);
     void finalizeActiveStep();
     void finish();
     [[nodiscard]] bool writeReport(bool passed,
@@ -76,5 +78,8 @@ private:
     QVector<StepResult> m_results;
     QElapsedTimer m_timer;
     qsizetype m_activeStep = -1;
+    std::atomic<qsizetype> m_pendingStep{-1};
+    // Accessed only by direct scene-graph callbacks on the rendering thread.
+    qsizetype m_synchronizedStep = -1;
     bool m_finished = false;
 };

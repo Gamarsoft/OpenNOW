@@ -223,3 +223,32 @@ Crowdin and should change only through Crowdin synchronization pull requests.
 - Full login and gameplay validation requires a real NVIDIA/GFN account. Without credentials, use
   the Qt unit, smoke, screenshot, and performance harnesses documented in `opennow-qt/README.md`
   and `docs/qt-acceptance.md`.
+
+## Local Windows workflow on this PC
+
+This section supplements the upstream instructions above. For `E:\DEV\OpenNOW` on this PC,
+use the local paths and Release workflow in [docs/windows-local-development.md](docs/windows-local-development.md)
+instead of the generic build-directory and Debug examples above.
+
+- Read that runbook before building, testing, profiling, or restarting this checkout.
+- Reuse `E:\DEV\Tools\OpenNOW`: `Doctor.ps1`, `Build.ps1`, and `Test.ps1` run in separate
+  PowerShell 7 processes. `Environment.ps1` initializes the real x64 MSVC environment;
+  `NativeCommand.ps1` preserves native exit codes and bounds command logs.
+- Build with Ninja Multi-Config, `--config Release`, and two jobs in `E:\DEV\b\OpenNOW`.
+  Use `E:\DEV\b\OpenNOW\Release\OpenNOW.exe` with its parent as the launch working directory.
+  Do not impose a global `CARGO_TARGET_DIR` or benchmark Debug builds.
+- Run the narrowest relevant test before the selected full software suite. `Test.ps1` uses
+  an English process locale and the software renderer; it launches account-free acceptance
+  processes. Its results do not establish native GPU, display, HDR, or live-stream behavior.
+- Use a fresh environment for native profiling. Ask before hardware fixtures or interactive
+  launches unless that batch is already authorized. Ask before NVIDIA/GFN login or gameplay.
+  Keep current refresh-rate budgets and verify the actual renderer, size, and focus.
+- Keep new development outputs, temporary files, logs, and reports on E: where supported.
+  Request approval before installations, upgrades, persistent configuration changes, cleanup,
+  relocation, or publishing. Record unavoidable C: usage.
+- Preserve the original baseline records. Report passed, failed, skipped, and unexecuted checks
+  separately, and distinguish the unchanged baseline from later approved source fixes.
+- Helpers and historical evidence are local files outside this Git checkout. Inspect the current
+  branch, source changes, executable hash, and installed paths rather than assuming a dated
+  report describes the current build. Alternate executable launches can change the Windows
+  `opennow:` protocol association; follow the runbook before launching a diagnostic copy.

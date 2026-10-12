@@ -12,6 +12,8 @@ FocusScope {
     property int selectedSection: 3
     property string searchQuery: ""
     property bool advancedOpen: false
+    property bool active: true
+    property bool initialized: false
     // Isolated visual acceptance only; never selects alternate production UI.
     property string acceptancePanel: ""
     readonly property var acceptancePanels: ({stats:statsSettingsPage, audio:audioPage,
@@ -44,9 +46,35 @@ FocusScope {
         return !query || (section.label + " " + section.detail + " " + section.keywords).toLowerCase().indexOf(query) >= 0
     }
 
-    Component.onCompleted: {
+    function refreshAccountData() {
         ShellStore.refreshRegions()
         ShellStore.refreshGameAccounts()
+    }
+
+    function resetPageControls(item) {
+        if (!item) return
+        // Only these picker properties are imperative. Disclosure bindings stay intact.
+        if (item.optionsCreated !== undefined) item.expanded = false
+        if (item.statisticsOpen !== undefined) item.statisticsOpen = false
+        for (const child of item.children || []) resetPageControls(child)
+    }
+
+    onActiveChanged: {
+        if (!initialized) return
+        if (active) {
+            refreshAccountData()
+        } else {
+            searchQuery = ""
+            advancedOpen = false
+            contentFlick.contentY = 0
+            resetPageControls(pageLoader.item)
+            tenBitWarning.close()
+            selectedSection = 3
+        }
+    }
+    Component.onCompleted: {
+        initialized = true
+        if (active) refreshAccountData()
     }
 
     function boolSetting(key, fallbackValue) {
@@ -509,6 +537,7 @@ FocusScope {
                 id: pageLoader
                 objectName: "settingsPageLoader"
                 width: contentFlick.width
+                asynchronous: !root.active
                 sourceComponent: SmokeTestMode && root.acceptancePanel !== ""
                     ? root.acceptancePanels[root.acceptancePanel] : root.pageComponents[root.selectedSection]
                 opacity: sectionEntrance.pageOpacity
